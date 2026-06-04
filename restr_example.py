@@ -36,11 +36,13 @@ RESTRAINTS_CONFIG = {
     "gpu": True,  # -> torch backend (ESMFold2 runs on GPU)
     "max_iter": 200,
     "method": "CG",
-    "start_sigma": 99999999,  # a restraint is active when sigma <= start_sigma
+    # start_sigma is OPTIONAL per distance entry and in conformer_restraints_config
+    # (omit -> active every step; active when sigma <= start_sigma); no global/top-level.
     "distance_restraints_config": [
         {
             "atom_selection1": "chain A and ((resid 5 to 84) or (resid 186 to 224))",
             "atom_selection2": "chain A and (resid 90 to 180)",
+            "start_sigma": 99999999,
             "harmonic": {"target_distance": 25.0},
         }
     ],
@@ -50,6 +52,7 @@ RESTRAINTS_CONFIG = {
     # ligand bonds come from token_bonds (connectivity only, no bond order), so the
     # dihedral (cis/trans) term finds nothing here (dihedrals=0), like chai.
     # "conformer_restraints_config": {
+    #     "start_sigma": 1.0,   # optional (omit -> every step)
     #     "bond": {"weight": 1.0},
     #     "angle": {"weight": 1.0},
     #     "chiral": {"weight": 1.0},
