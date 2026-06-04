@@ -297,6 +297,7 @@ class ESMFold2InputBuilder:
         max_inference_sigma: float | None = None,
         early_exit: bool = False,
         complex_id: str = "pred",
+        restraints_config: dict | None = None,
     ) -> MolecularComplexResult | list[MolecularComplexResult]:
         """Fold a structure end-to-end: encode → model → decode.
 
@@ -314,6 +315,10 @@ class ESMFold2InputBuilder:
             Optional sampler overrides forwarded to the model when not None.
         complex_id : str
             Identifier assigned to the predicted MolecularComplex(es).
+        restraints_config : dict, optional
+            rgi_utils restraint-guided-inference config (distance + ligand conformer
+            restraints). When set, restraints are applied to the x0 prediction at each
+            diffusion step. Requires ``rgi_utils[torch]`` to be importable.
 
         Returns
         -------
@@ -323,6 +328,23 @@ class ESMFold2InputBuilder:
         features, chain_infos = self.prepare_input(
             input, seed=seed, device=model.device
         )
+
+        # Restraint-guided inference (rgi_utils, optional): build ONE
+        # CombinedRestraints per structure from the prepared features + chain
+        # metadata. The model applies restr.minimize() to the x0 prediction after
+        # each diffusion step (gated on the pre-step sigma). rgi_utils is imported
+        # lazily so it is only required when restraints_config is provided.
+        restr = None
+        if restraints_config:
+            from rgi_utils.combined import CombinedRestraints
+            from rgi_utils.esmfold2.adapter import ESMFold2Adapter
+
+            restr = CombinedRestraints()
+            restr.setup(
+                ESMFold2Adapter(features, chain_infos),
+                nbatch=num_diffusion_samples,
+                config=restraints_config,
+            )
 
         sampler_kwargs: dict[str, Any] = {}
         if noise_scale is not None:
@@ -340,8 +362,13 @@ class ESMFold2InputBuilder:
                     num_sampling_steps=num_sampling_steps,
                     num_diffusion_samples=num_diffusion_samples,
                     early_exit=early_exit,
+                    restraints=restr,
                     **sampler_kwargs,
                 )
+
+        # Optional per-term restraint energy log on the final coordinates.
+        if restr is not None and restr.is_active():
+            restr.finalize(output["sample_atom_coords"], num_sampling_steps)
 
         return self.decode(
             output,
