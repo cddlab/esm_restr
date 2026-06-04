@@ -24,6 +24,12 @@ PIXI="${PIXI:-$([ -x ../.pixi-bin/pixi ] && echo ../.pixi-bin/pixi || echo pixi)
 # ESMFold2InputBuilder().fold(); the model minimizes it on the x0 prediction each step.
 "$PIXI" run python restr_example.py
 
-# Verify the two restraint groups' COM distance reaches ~25 A (root check script).
-"$PIXI" run python ../check_dist.py out_esm_dist.cif || true
+# Verify the two restraint groups' COM distance reaches ~25 A. check_dist.py needs
+# gemmi, which the esm pixi env does NOT have — use a gemmi-enabled tool venv instead.
+GEMMI_PY=../chai-lab_restr/.venv/bin/python
+if [ -x "$GEMMI_PY" ] && "$GEMMI_PY" -c "import gemmi" 2>/dev/null; then
+    "$GEMMI_PY" ../check_dist.py out_esm_dist.cif || true
+else
+    echo "skip COM check: no gemmi-enabled venv found (run ../check_dist.py with one manually)"
+fi
 echo done
