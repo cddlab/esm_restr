@@ -33,7 +33,7 @@ QBP = (
 # ``chain`` / ``resid`` use the per-chain 1-based residue ordinal (resets per chain).
 RESTRAINTS_CONFIG = {
     "verbose": True,
-    "gpu": True,  # -> torch backend (ESMFold2 runs on GPU)
+    "gpu": True,  # torch device: True=GPU, False=CPU (backend: numpy/jax to override)
     "max_iter": 200,
     "method": "CG",
     # start_sigma is OPTIONAL per distance entry and in conformer_restraints_config
