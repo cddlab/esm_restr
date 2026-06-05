@@ -34,8 +34,7 @@ QBP = (
 # rgi_utils restraints_config — same schema as the other *_restr tools.
 RESTRAINTS_CONFIG = {
     "verbose": True,
-    "gpu": True,  # torch device: True=GPU, False=CPU (backend: numpy/jax to override)
-    "max_iter": 200,
+    "gpu": True,  # torch device: True=GPU, False=CPU    "max_iter": 200,
     "method": "CG",
     "rmsd_restraints_config": [
         {
