@@ -33,7 +33,8 @@ QBP = (
 # ``chain`` / ``resid`` use the per-chain 1-based residue ordinal (resets per chain).
 RESTRAINTS_CONFIG = {
     "verbose": True,
-    "gpu": True,  # torch device: True=GPU, False=CPU    "max_iter": 200,
+    "gpu": True,  # torch device: True=GPU, False=CPU
+    "max_iter": 200,
     "method": "CG",
     # start_sigma is OPTIONAL per distance entry and in conformer_restraints_config
     # (omit -> active every step; active when sigma <= start_sigma); no global/top-level.
@@ -58,6 +59,18 @@ RESTRAINTS_CONFIG = {
     #     "dihedral": {"weight": 1.0},
     #     "vdw": {"weight": 1.0, "mode": "intramolecular"},
     # },
+    # --- RMSD restraint ----------------------------------------------------------
+    # Kabsch-superposed RMSD of a moving group toward target_rmsd vs a reference PDB.
+    # REQUIRES a reference: fold this sequence once WITHOUT restraints, write
+    # result.complex.to_mmcif(), convert to rmsd_ref.pdb (gemmi make_pdb_string()) first.
+    # Atoms pair by IDENTITY (chain, resid, name), so the ref atom order need not match.
+    # atom_selection is OPTIONAL: omitted here -> fit + measure RMSD over the WHOLE structure,
+    # best-effort (atoms missing from the ref are skipped); give atom_selection_ref/target
+    # (or _fit/_calc) to restrain a region.
+    "rmsd_restraints_config": [
+        {"ref_pdb": "rmsd_ref.pdb", "target_rmsd": 0.0},  # whole structure; for a region
+        # add "atom_selection_ref"/"atom_selection_target": "chain A and (resid 90 to 180)"
+    ],
 }
 
 
