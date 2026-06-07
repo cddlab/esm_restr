@@ -102,6 +102,10 @@ class ChainInfo:
     tokens: list[TokenInfo] = field(default_factory=list)
     # (atom_name1, atom_name2) bonds for SMILES ligands, which have no CCD entry.
     ligand_bonds: list[tuple[str, str]] = field(default_factory=list)
+    # (atom_name1, atom_name2, order) CCD ligand bonds with Kekulized order, populated by
+    # compute_token_bonds. Carries bond order to the rgi_utils conformer restraint adapter
+    # (the binary token_bonds feature drops it); enables aromatic-aware UFF-relax targets.
+    ligand_bond_orders: list[tuple[str, str, int]] = field(default_factory=list)
 
 
 # =============================================================================
@@ -969,9 +973,17 @@ def compute_token_bonds(
     """Compute dense token bond matrix [L, L, 1].
 
     Includes ligand intra-residue bonds (from CCD) and covalent bonds.
+
+    Side effect: records each ligand's (atom1_name, atom2_name, order) CCD bonds on its
+    ``ChainInfo.ligand_bond_orders``, where ``order`` is the Kekulized RDKit bond order
+    (aromatic -> 1/2). The dense ``token_bonds`` the model consumes stays binary; the
+    orders ride on chain_infos (NOT the model feature dict, which is batched/moved to
+    device) for the rgi_utils conformer restraint (ESMFold2 adapter), which needs
+    aromatic perception so its UFF-relaxed bond/angle target keeps rings planar.
     """
     n_tokens = len(tokens)
     edge_set: set[tuple[int, int]] = set()
+    chain_by_asym = {c.asym_id: c for c in chains}
 
     def add_bond(i: int, j: int) -> None:
         if i != j:
@@ -1020,9 +1032,15 @@ def compute_token_bonds(
             bonds = get_ligand_ccd_bonds(res_name)
 
         if bonds:
-            for a1, a2 in bonds:
+            ch = chain_by_asym.get(asym_id_val)
+            for bnd in bonds:
+                a1, a2 = bnd[0], bnd[1]
                 if a1 in atom_to_tok and a2 in atom_to_tok:
                     add_bond(atom_to_tok[a1], atom_to_tok[a2])
+                    # CCD bonds carry a real Kekulized order (3-tuple); record it on the
+                    # chain for the restraint adapter. SMILES bonds (2-tuple) have none.
+                    if ch is not None and len(bnd) > 2:
+                        ch.ligand_bond_orders.append((a1, a2, int(bnd[2])))
         else:
             # Fallback: fully connected within residue
             tok_indices = [ti for _, ti in atom_list]

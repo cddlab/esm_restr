@@ -223,8 +223,17 @@ def get_ligand_ccd_atoms_with_charges(
     return atoms if atoms else None
 
 
-def get_ligand_ccd_bonds(comp_id: str) -> list[tuple[str, str]] | None:
-    """Get list of (atom1_name, atom2_name) bonds for a CCD component.
+def get_ligand_ccd_bonds(comp_id: str) -> list[tuple[str, str, int]] | None:
+    """Get list of (atom1_name, atom2_name, order) bonds for a CCD component.
+
+    ``order`` is the RDKit integer bond order: 1/2/3 for single/double/triple and 4 for
+    an AROMATIC bond. We do NOT Kekulize: the ESMFold2 CCD molecules are heavy-atom-only
+    (no hydrogens), so Kekulization fails (an aromatic N can't satisfy its valence without
+    its H) and would silently collapse aromatic bonds to single. Passing aromatic as 4
+    instead lets the downstream ``build_ligand_mol`` (order_map 4 -> BondType.AROMATIC)
+    re-perceive aromaticity, so the conformer restraint's UFF-relaxed bond/angle target
+    keeps aromatic rings planar. The order is consumed only by the rgi_utils restraint
+    (via the ESMFold2 adapter -> chain_infos); token_bonds ignores the order column.
 
     Returns None if CCD data not available.
     """
@@ -245,7 +254,7 @@ def get_ligand_ccd_bonds(comp_id: str) -> list[tuple[str, str]] | None:
         if isinstance(atom_name, str) and atom_name:
             included_atoms.add(atom_name)
 
-    bonds: list[tuple[str, str]] = []
+    bonds: list[tuple[str, str, int]] = []
     for bond in mol.GetBonds():
         a1 = bond.GetBeginAtom()
         a2 = bond.GetEndAtom()
@@ -259,7 +268,8 @@ def get_ligand_ccd_bonds(comp_id: str) -> list[tuple[str, str]] | None:
             and n1 in included_atoms
             and n2 in included_atoms
         ):
-            bonds.append((n1, n2))
+            order = 4 if bond.GetIsAromatic() else int(bond.GetBondTypeAsDouble())
+            bonds.append((n1, n2, order))
 
     _CCD_BONDS_CACHE[comp_id] = bonds
     return bonds if bonds else None
