@@ -55,6 +55,8 @@ RESTRAINTS_CONFIG = {
             "atom_selection2": "chain A and (resid 90 to 180)",
             "start_sigma": 99999999,  # optional; omit -> every step (this value == always on)
             # "stop_sigma": -1,  # optional lower bound (default -1 = off)
+            # "move": "both",  # which group moves: both (default) / 1 (only
+            #   atom_selection1) / 2 (only atom_selection2); 1/2 pin the other group.
             "harmonic": {"target_distance": 25.0},
         }
     ],
