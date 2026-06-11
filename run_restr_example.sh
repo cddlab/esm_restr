@@ -19,8 +19,8 @@ PIXI="${PIXI:-$([ -x ../.pixi-bin/pixi ] && echo ../.pixi-bin/pixi || echo pixi)
 "$PIXI" install
 "$PIXI" run python -m pip install -e ../transformers_restr -e "../rgi_utils[torch]"
 
-# restr_example.py folds qbp with a single harmonic distance restraint (target 25 A) and a
-# commented-out ligand-conformer variant. RGI: restraints_config is a Python dict passed to
+# restr_example.py folds qbp + its GLN ligand with a harmonic distance restraint (target
+# 25 A) AND a GLN conformer restraint. RGI: restraints_config is a Python dict passed to
 # ESMFold2InputBuilder().fold(); the model minimizes it on the x0 prediction each step.
 "$PIXI" run python restr_example.py
 
@@ -28,7 +28,7 @@ PIXI="${PIXI:-$([ -x ../.pixi-bin/pixi ] && echo ../.pixi-bin/pixi || echo pixi)
 # gemmi, which the esm pixi env does NOT have — use a gemmi-enabled tool venv instead.
 GEMMI_PY=../chai-lab_restr/.venv/bin/python
 if [ -x "$GEMMI_PY" ] && "$GEMMI_PY" -c "import gemmi" 2>/dev/null; then
-    "$GEMMI_PY" ../check_dist.py out_esm_dist.cif || true
+    "$GEMMI_PY" ../check_dist.py out_esm.cif || true
 else
     echo "skip COM check: no gemmi-enabled venv found (run ../check_dist.py with one manually)"
 fi

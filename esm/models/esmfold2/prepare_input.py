@@ -101,7 +101,7 @@ class ChainInfo:
     mol_type: int
     tokens: list[TokenInfo] = field(default_factory=list)
     # (atom_name1, atom_name2) bonds for SMILES ligands, which have no CCD entry.
-    ligand_bonds: list[tuple[str, str]] = field(default_factory=list)
+    ligand_bonds: list[tuple[str, str, int]] = field(default_factory=list)
     # (atom_name1, atom_name2, order) CCD ligand bonds with Kekulized order, populated by
     # compute_token_bonds. Carries bond order to the rgi_utils conformer restraint adapter
     # (the binary token_bonds feature drops it); enables aromatic-aware UFF-relax targets.
@@ -572,7 +572,7 @@ def tokenize_ligand_smiles(
     atom_offset: int,
     space_uid_offset: int,
     seed: int | None = None,
-) -> tuple[list[TokenInfo], list[AtomInfo], list[tuple[str, str]]]:
+) -> tuple[list[TokenInfo], list[AtomInfo], list[tuple[str, str, int]]]:
     """Tokenize a ligand from SMILES (1 token per heavy atom).
 
     Returns tokens, atoms, and heavy-atom bonds as (name1, name2) pairs.
@@ -660,11 +660,22 @@ def tokenize_ligand_smiles(
         token_idx += 1
         atom_idx += 1
 
-    bonds: list[tuple[str, str]] = []
-    for bond in mol_no_h.GetBonds():
+    # Emit Kekulized bond ORDERS (3-tuples) so the ESMFold2 adapter can build a
+    # DOUBLE-aware ligand mol: this drives aromatic re-perception for the UFF bond/angle
+    # target AND enables the cis/trans dihedral term (which keys on acyclic non-aromatic
+    # BondType.DOUBLE). Mirrors the CCD path, whose get_ligand_ccd_bonds already yields
+    # Kekulized 3-tuples; downstream (compute_token_bonds, ChainInfo.ligand_bond_orders)
+    # already handles the 3-tuple form.
+    bonds: list[tuple[str, str, int]] = []
+    mk = Chem.Mol(mol_no_h)
+    try:
+        Chem.Kekulize(mk, clearAromaticFlags=True)
+    except Exception:
+        mk = mol_no_h  # leave aromatic; order falls back to 1 (no worse than before)
+    for bond in mk.GetBonds():
         n1 = bond.GetBeginAtom().GetProp("name")
         n2 = bond.GetEndAtom().GetProp("name")
-        bonds.append((n1, n2))
+        bonds.append((n1, n2, int(bond.GetBondTypeAsDouble())))
 
     return tokens, atoms_list, bonds
 
@@ -768,7 +779,7 @@ def build_chains_from_input(
 
             elif isinstance(item, LigandInput):
                 has_cov = chain_id_str in covalent_chain_ids
-                ligand_bonds: list[tuple[str, str]] = []
+                ligand_bonds: list[tuple[str, str, int]] = []
                 if item.ccd is not None:
                     if item.smiles is not None:
                         warnings.warn("Both ccd and smiles provided, using ccd")
@@ -1016,7 +1027,7 @@ def compute_token_bonds(
             )
 
     # SMILES ligand bonds keyed by (asym_id, residue_index 0).
-    explicit_bonds: dict[tuple[int, int], list[tuple[str, str]]] = {
+    explicit_bonds: dict[tuple[int, int], list[tuple[str, str, int]]] = {
         (c.asym_id, 0): c.ligand_bonds for c in chains if c.ligand_bonds
     }
 
