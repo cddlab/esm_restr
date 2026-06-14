@@ -74,6 +74,35 @@ RESTRAINTS_CONFIG = {
         "dihedral": {"weight": 1.0},
         "vdw": {"weight": 1.0, "mode": "intramolecular"},
     },
+    # --- group-COM angle / dihedral restraints (optional) ------------------------
+    # angle = DEGREES of the COMs of THREE groups, vertex = group 2 (COM1-COM2-COM3);
+    # dihedral = DEGREES of FOUR group COMs, axis = group2-group3. Same restraint types
+    # (harmonic / flat-bottomed / flat-bottomed1 / flat-bottomed2) and `move` key as the
+    # distance restraint; CG-solved. Uncomment:
+    # "angle_restraints_config": [
+    #     {
+    #         "atom_selection1": "chain A and (resid 5 to 84)",
+    #         "atom_selection2": "chain A and (resid 90 to 180)",   # vertex (group 2)
+    #         "atom_selection3": "chain A and (resid 186 to 224)",
+    #         "harmonic": {"target_angle": 90.0},   # DEGREES; or flat-bottomed:
+    #         #   {"target_angle1": 80.0, "target_angle2": 100.0} (also flat-bottomed1/2)
+    #         # "move": "1,3",  # DEFAULT: arms (1,3) free, vertex (group 2) pinned.
+    #         #                  #   or "all" | an index | a list [1, 3]
+    #         # "weight": 1.0,   # optional; start_sigma / stop_sigma optional
+    #     }
+    # ],
+    # "dihedral_restraints_config": [
+    #     {
+    #         "atom_selection1": "chain A and (resid 5 to 50)",
+    #         "atom_selection2": "chain A and (resid 51 to 100)",
+    #         "atom_selection3": "chain A and (resid 101 to 150)",
+    #         "atom_selection4": "chain A and (resid 151 to 224)",
+    #         "harmonic": {"target_dihedral": 180.0},   # DEGREES (periodicity-safe); or
+    #         #   flat-bottomed {"target_dihedral1", "target_dihedral2"} (no +-180 straddle)
+    #         # "move": "1,4",  # DEFAULT: ends (1,4) free, axis (groups 2,3) pinned.
+    #         #                  #   or "all" | an index | a list [1, 4]
+    #     }
+    # ],
     # --- RMSD restraint ----------------------------------------------------------
     # Kabsch-superposed RMSD of a moving group toward target_rmsd vs a reference PDB.
     # REQUIRES a reference: fold this sequence once WITHOUT restraints, write
