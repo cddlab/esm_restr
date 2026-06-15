@@ -47,7 +47,7 @@ RESTRAINTS_CONFIG = {
     "method": "CG",
     "distance_restraints_config": [
         {
-            # COM distance between two protein residue groups, pulled to 25 A. Qualify
+            # centroid distance between two protein residue groups, pulled to 25 A. Qualify
             # with `chain A` so a bare resid range cannot also sweep in the ligand
             # (chain B). type: harmonic{target_distance} |
             # flat-bottomed{target_distance1,target_distance2} | flat-bottomed1 | flat-bottomed2.
@@ -74,9 +74,9 @@ RESTRAINTS_CONFIG = {
         "dihedral": {"weight": 1.0},
         "vdw": {"weight": 1.0, "mode": "intramolecular"},
     },
-    # --- group-COM angle / dihedral restraints (optional) ------------------------
-    # angle = DEGREES of the COMs of THREE groups, vertex = group 2 (COM1-COM2-COM3);
-    # dihedral = DEGREES of FOUR group COMs, axis = group2-group3. Same restraint types
+    # --- group-centroid angle / dihedral restraints (optional) ------------------------
+    # angle = DEGREES of the centroids of THREE groups, vertex = group 2 (centroid1-centroid2-centroid3);
+    # dihedral = DEGREES of FOUR group centroids, axis = group2-group3. Same restraint types
     # (harmonic / flat-bottomed / flat-bottomed1 / flat-bottomed2) and `move` key as the
     # distance restraint; CG-solved. Uncomment:
     # "angle_restraints_config": [
