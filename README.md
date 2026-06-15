@@ -1,3 +1,8 @@
+see [rgi_utils](https://github.com/cddlab/rgi_utils) for more information.
+
+<details>
+<summary>Original README</summary>
+
 <div align="center">
   <img src="_assets/header.png" style="width: 60%; height: auto;" />
 
@@ -346,3 +351,5 @@ If you use ESM in your work, please cite one of the following:
   URL = {https://doi.org/10.5281/zenodo.14219303}
 }
 ```
+
+</details>
