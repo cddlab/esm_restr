@@ -662,7 +662,7 @@ def tokenize_ligand_smiles(
 
     # Emit Kekulized bond ORDERS (3-tuples) so the ESMFold2 adapter can build a
     # DOUBLE-aware ligand mol: this drives aromatic re-perception for the UFF bond/angle
-    # target AND enables the cis/trans dihedral term (which keys on acyclic non-aromatic
+    # target AND enables the cistrans term (which keys on acyclic non-aromatic
     # BondType.DOUBLE). Mirrors the CCD path, whose get_ligand_ccd_bonds already yields
     # Kekulized 3-tuples; downstream (compute_token_bonds, ChainInfo.ligand_bond_orders)
     # already handles the 3-tuple form.
