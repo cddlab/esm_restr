@@ -47,6 +47,10 @@ class LigandInput:
     id: str | list[str]
     smiles: str | None = None
     ccd: list[str] | None = None
+    # RGI per-ligand conformer_restraints opt-in (default off). Set true to enable this
+    # ligand's bond/angle/chiral/cistrans/vdw conformer restraints; propagated to
+    # ChainInfo and read by the rgi esmfold2 adapter.
+    conformer_restraints: bool = False
 
 
 @dataclass
@@ -117,6 +121,7 @@ def serialize_structure_prediction_input(all_atom_input: StructurePredictionInpu
                     "smiles": seq_input.smiles,
                     "id": seq_input.id,
                     "ccd": seq_input.ccd,
+                    "conformer_restraints": seq_input.conformer_restraints,
                     "type": "ligand",
                 }
             )
@@ -210,7 +215,10 @@ def deserialize_structure_prediction_input(
         elif t == "ligand":
             sequences.append(
                 LigandInput(
-                    id=chain["id"], smiles=chain.get("smiles"), ccd=chain.get("ccd")
+                    id=chain["id"],
+                    smiles=chain.get("smiles"),
+                    ccd=chain.get("ccd"),
+                    conformer_restraints=chain.get("conformer_restraints", False),
                 )
             )
         else:
