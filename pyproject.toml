@@ -22,7 +22,7 @@ classifiers = [
 
 dependencies = [
   "torch>=2.2.0",
-  "transformers @ git+https://github.com/Biohub/transformers.git@main",
+  "transformers @ git+https://github.com/cddlab/transformers_restr.git@rgi-integration",
   "ipython",
   "einops",
   "biotite>=1.0.0",
@@ -79,6 +79,8 @@ python = "3.12.*"
 
 [tool.pixi.pypi-dependencies]
 esm = { path = ".", editable = true }
+# RGI shared engine (no extra: esm supplies its own cu128 torch above).
+rgi-utils = { git = "https://github.com/cddlab/rgi_utils.git" }
 
 # Pull torch from the CUDA 12.8 wheel index so it ships Blackwell (sm_120) kernels.
 # cu128 wheels remain backward-compatible with sm_89 (RTX 4090), so esm runs on every
