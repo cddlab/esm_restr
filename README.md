@@ -9,7 +9,7 @@ see [rgi_utils](https://github.com/cddlab/rgi_utils) for more information.
 # A world model of protein biology: ESMC, ESMFold2, & ESM Atlas
 
 
-[ESMC & ESMFold2 Preprint](https://biohub.ai/papers/esm_protein.pdf) &sdot;  [Atlas](https://biohub.ai/esm/protein/atlas) &sdot; [Tutorials](https://github.com/Biohub/esm/tree/main/cookbook/tutorials) &sdot; [Slack](https://bit.ly/esm-slack)<br>
+[ESMC & ESMFold2 Preprint](https://www.biorxiv.org/content/10.64898/2026.06.03.729735) &sdot;  [Atlas](https://biohub.ai/esm/protein/atlas) &sdot; [Tutorials](https://github.com/Biohub/esm/tree/main/cookbook/tutorials) &sdot; [Slack](https://join.slack.com/t/biohub-community/shared_invite/zt-3yxdy77dv-rJHI97SprbDXwEYP3Y1tqQ)<br>
 </div>
 
 We are releasing a world model for protein biology: a scientific engine for prediction, design, and discovery. Built on the latest generation of Evolutionary Scale Modeling (ESM), this system learns from the protein sequences produced by evolution and uses that knowledge to represent, map, predict, and design proteins across scales — from atomic interactions to evolutionary relationships spanning billions of years. The system includes three artifacts: ESMC, ESMFold2, and ESM Atlas.
@@ -30,7 +30,7 @@ We are releasing a world model for protein biology: a scientific engine for pred
 </div>
 
 
-ESMFold2 is validated in the lab across five therapeutic targets. Inversion of ESMFold2 enables generation of de novo minibinders and antibody-derived scFvs with high hit rates, nanomolar affinities, target specificity, and functional activity. We've released the full protocol from target sequence to ranked binder design in this [notebook](https://github.com/Biohub/esm/blob/main/cookbook/tutorials/binder_design.ipynb). For additional details, please refer to the [preprint](https://biohub.ai/papers/esm_protein.pdf).
+ESMFold2 is validated in the lab across five therapeutic targets. Inversion of ESMFold2 enables generation of de novo minibinders and antibody-derived scFvs with high hit rates, nanomolar affinities, target specificity, and functional activity. We've released the full protocol from target sequence to ranked binder design in this [notebook](https://github.com/Biohub/esm/blob/main/cookbook/tutorials/binder_design.ipynb). For additional details, please refer to the [preprint](https://www.biorxiv.org/content/10.64898/2026.06.03.729735).
 
 <div align="center">
   <img src="_assets/esmfold2_binder.png" width="60%"/>
@@ -59,16 +59,16 @@ Codebase, model weights, and model variants for ESMC are available through [Hugg
 
 There are two primary ways of running the ESM models: through the [**Biohub Platform**](https://biohub.ai/) or locally with Hugging Face. The Biohub Platform enables users to easily run inference with ESM models with minimal setup. Users interested in customizing or fine-tuning ESM models can use the models from Hugging Face.
 
-### Running ESMC Locally
-<a name="running-esmc-locally"></a>
+### Running ESMC Through Hugging Face
+<a name="running-esmc-through-hugging-face"></a>
 
-Install `esm` from GitHub (a PyPI release is coming soon):
+First, install `esm` from GitHub (a PyPI release is coming soon):
 
 ```
 pip install esm@git+https://github.com/Biohub/esm.git@main
 ```
 
-The following code demonstrates how to run ESMC locally
+Then use the following code to run ESMC using the Transformers library via Hugging Face:
 
 ```python
 import torch
@@ -149,6 +149,16 @@ The sparse autoencoder used in the Atlas and analyzed in the paper, `ESMC-6B-sae
 
 Codebase, model weights, and model variants for ESMC SAEs are available through [Hugging Face](https://huggingface.co/collections/biohub/esmc-saes-for-hidden-states-all-layers).
 
+### Running SAEs Through Hugging Face
+
+First, install `esm` from GitHub (a PyPI release is coming soon):
+
+```
+pip install esm@git+https://github.com/Biohub/esm.git@main
+```
+
+Then use the following code to set up an ESMC SAE using the Transformers library via Hugging Face:
+
 ```python
 import torch
 from transformers import AutoModel, AutoTokenizer
@@ -175,11 +185,13 @@ output["sae_outputs"]["layer60"]  # sparse.coo tensor
 print(output["sae_outputs"]["layer60"].shape)
 
 ```
+### Running SAEs Through The Biohub Platform
 
-For tutorials on how to use ESMC SAEs, see our [tutorials](https://github.com/Biohub/esm/tree/main/cookbook/tutorials).
+For a tutorial on using SAEs using the Biohub Platform, see [here](https://github.com/Biohub/esm/blob/main/cookbook/tutorials/esmc_sae_feature_interpretation.ipynb).
 
 ## ESMFold2
 <a name="esmfold2"></a>
+
 
 [ESMFold2](https://huggingface.co/biohub/ESMFold2) is a state-of-the-art protein structure prediction model that combines ESMC (6B parameter) language model embeddings with a diffusion-based structure prediction architecture.
 
@@ -187,7 +199,16 @@ The model predicts high-resolution, all-atom 3D protein structures directly from
 
 Codebase, model weights, and model variants for ESMFold2 are available through [Hugging Face](https://huggingface.co/biohub/ESMFold2)
 
-### Running ESMFold2 Locally
+### Running ESMFold2 Through Hugging Face
+<a name="running-esmfold2-through-hugging-face"></a>
+
+First, install `esm` from GitHub (a PyPI release is coming soon):
+
+```
+pip install esm@git+https://github.com/Biohub/esm.git@main
+```
+
+Then use the following code to run ESMFold2 locally using the Transformers library via Hugging Face:
 
 ```python
 from esm.models.esmfold2 import (
@@ -228,7 +249,7 @@ spi = StructurePredictionInput(
 )
 
 result = ESMFold2InputBuilder().fold(
-    model, spi, num_loops=3, num_sampling_steps=50, num_diffusion_samples=1, seed=0
+    model, spi, num_loops=20, num_sampling_steps=100, num_diffusion_samples=1, seed=0
 )
 
 print(f"pLDDT mean: {float(result.plddt.mean()):.3f}, pTM: {float(result.ptm):.3f}, ipTM: {float(result.iptm):.3f}")
@@ -271,7 +292,10 @@ ca2_input = StructurePredictionInput(
     sequences=[ProteinInput(id="A", sequence=ca2_sequence)]
 )
 
-config = FoldingConfig(num_loops=3, num_sampling_steps=32)
+config = FoldingConfig(
+    num_loops=20,
+    num_sampling_steps=100
+)
 result = client.fold_all_atom(ca2_input, config=config)
 
 with open("result.cif", "w") as f:
@@ -322,7 +346,7 @@ If you use ESM in your work, please cite one of the following:
             and Pannu, Jassi and Bachas, Sharrol and Liu, Daniel S.
             and Sercu, Tom and Rives, Alexander},
   year   = {2026},
-  url    = {https://biohub.ai/papers/esm_protein.pdf},
+  url    = {https://www.biorxiv.org/content/10.64898/2026.06.03.729735},
   note   = {Preprint}
 }
 ```
