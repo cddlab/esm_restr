@@ -172,6 +172,7 @@ def clean_esmfold2_input(input: StructurePredictionInput) -> StructurePrediction
                 sequence=chain,
                 msa=chain_msa,
                 modifications=chain_modifications,
+                conformer_restraints=item.conformer_restraints,
             )
 
     return StructurePredictionInput(

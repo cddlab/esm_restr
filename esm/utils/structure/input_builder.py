@@ -26,6 +26,7 @@ class ProteinInput:
     sequence: str
     modifications: list[Modification] | None = None
     msa: MSAInput = None
+    conformer_restraints: bool = False
 
 
 @dataclass
@@ -34,6 +35,7 @@ class RNAInput:
     sequence: str
     modifications: list[Modification] | None = None
     msa: MSAInput = None
+    conformer_restraints: bool = False
 
 
 @dataclass
@@ -41,6 +43,7 @@ class DNAInput:
     id: str | list[str]
     sequence: str
     modifications: list[Modification] | None = None
+    conformer_restraints: bool = False
 
 
 @dataclass
@@ -48,9 +51,6 @@ class LigandInput:
     id: str | list[str]
     smiles: str | None = None
     ccd: list[str] | None = None
-    # RGI per-ligand conformer_restraints opt-in (default off). Set true to enable this
-    # ligand's bond/angle/chiral/cistrans/vdw conformer restraints; propagated to
-    # ChainInfo and read by the rgi esmfold2 adapter.
     conformer_restraints: bool = False
 
 
@@ -97,6 +97,8 @@ def serialize_structure_prediction_input(all_atom_input: StructurePredictionInpu
                 for mod in seq_input.modifications
             ]
             chain_data["modifications"] = mods
+        if seq_input.conformer_restraints:
+            chain_data["conformer_restraints"] = True
         if not hasattr(seq_input, "msa"):
             pass
         elif seq_input.msa is None:
@@ -195,6 +197,7 @@ def deserialize_structure_prediction_input(
                     sequence=chain["sequence"],
                     modifications=_mods(chain),
                     msa=_msa(chain),
+                    conformer_restraints=chain.get("conformer_restraints", False),
                 )
             )
         elif t == "rna":
@@ -204,6 +207,7 @@ def deserialize_structure_prediction_input(
                     sequence=chain["sequence"],
                     modifications=_mods(chain),
                     msa=_msa(chain),
+                    conformer_restraints=chain.get("conformer_restraints", False),
                 )
             )
         elif t == "dna":
@@ -212,6 +216,7 @@ def deserialize_structure_prediction_input(
                     id=chain["id"],
                     sequence=chain["sequence"],
                     modifications=_mods(chain),
+                    conformer_restraints=chain.get("conformer_restraints", False),
                 )
             )
         elif t == "ligand":

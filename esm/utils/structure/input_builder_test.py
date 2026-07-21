@@ -82,13 +82,14 @@ def test_roundtrip_protein_with_msa() -> None:
 def test_roundtrip_rna_dna_ligand() -> None:
     spi = StructurePredictionInput(
         sequences=[
-            ProteinInput(id="A", sequence="MAKL"),
+            ProteinInput(id="A", sequence="MAKL", conformer_restraints=True),
             RNAInput(
                 id="B",
                 sequence="ACGU",
                 modifications=[Modification(position=2, ccd="PSU")],
+                conformer_restraints=True,
             ),
-            DNAInput(id="C", sequence="ACGT"),
+            DNAInput(id="C", sequence="ACGT", conformer_restraints=True),
             LigandInput(id="D", smiles="CCO"),
             LigandInput(id="E", ccd=["ATP"]),
         ]

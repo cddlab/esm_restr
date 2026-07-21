@@ -106,8 +106,7 @@ class ChainInfo:
     # compute_token_bonds. Carries bond order to the rgi_utils conformer restraint adapter
     # (the binary token_bonds feature drops it); enables aromatic-aware UFF-relax targets.
     ligand_bond_orders: list[tuple[str, str, int]] = field(default_factory=list)
-    # RGI per-ligand conformer_restraints opt-in (from LigandInput); default off so a
-    # ligand is restrained only when it explicitly opted in. Read by the rgi esmfold2 adapter.
+    # Per-chain conformer-restraints opt-in from the sequence input.
     conformer_restraints: bool = False
 
 
@@ -822,9 +821,7 @@ def build_chains_from_input(
                 mol_type=new_tokens[0].mol_type if new_tokens else MOL_TYPE_PROTEIN,
                 tokens=new_tokens,
                 ligand_bonds=ligand_bonds if isinstance(item, LigandInput) else [],
-                conformer_restraints=(
-                    item.conformer_restraints if isinstance(item, LigandInput) else False
-                ),
+                conformer_restraints=item.conformer_restraints,
             )
             chains.append(chain)
             all_tokens.extend(new_tokens)
