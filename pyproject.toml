@@ -84,7 +84,7 @@ rgi-utils = { git = "https://github.com/cddlab/rgi_utils.git" }
 
 # Pull torch from the CUDA 12.8 wheel index so it ships Blackwell (sm_120) kernels.
 # cu128 wheels remain backward-compatible with sm_89 (RTX 4090), so esm runs on every
-# partition; on q4/maxq this also unlocks the larger VRAM needed for big systems (3zct).
+# partition; on Blackwell (sm_120) this also unlocks the larger VRAM needed for big systems.
 [tool.pixi.pypi-options]
 extra-index-urls = ["https://download.pytorch.org/whl/cu128"]
 index-strategy = "unsafe-best-match"
