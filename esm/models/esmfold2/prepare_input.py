@@ -129,6 +129,44 @@ def encode_atom_name(name: str) -> list[int]:
     return result
 
 
+def _smiles_atom_names(
+    symbols: list[str], canonical_order: list[int]
+) -> list[str]:
+    """Create unique four-character atom names for a SMILES molecule.
+
+    Preserve the existing ``ELEMENT + global canonical rank`` names when every
+    name fits. If any name overflows, number atoms separately within each element
+    in canonical order. The fallback is deterministic and avoids truncation.
+    """
+    if len(symbols) != len(canonical_order):
+        raise ValueError("atom symbols and canonical ranks must have the same length")
+
+    prefixes = [symbol.upper() for symbol in symbols]
+    names = [
+        f"{prefix}{int(rank) + 1}"
+        for prefix, rank in zip(prefixes, canonical_order, strict=True)
+    ]
+    if all(len(name) <= 4 for name in names):
+        return names
+
+    names = [""] * len(prefixes)
+    element_counts: dict[str, int] = {}
+    for atom_idx in sorted(range(len(prefixes)), key=canonical_order.__getitem__):
+        prefix = prefixes[atom_idx]
+        element_counts[prefix] = element_counts.get(prefix, 0) + 1
+        name = f"{prefix}{element_counts[prefix]}"
+        if len(name) > 4:
+            raise ValueError(
+                "cannot assign unique atom names within the four-character limit: "
+                f"{name}"
+            )
+        names[atom_idx] = name
+
+    if len(set(names)) != len(names):
+        raise ValueError("generated SMILES atom names are not unique")
+    return names
+
+
 def get_element_atomic_num(element: str) -> int:
     """Get atomic number for an element symbol."""
     if element in _ELEMENT_ATOMIC_NUM_CACHE:
@@ -587,14 +625,15 @@ def tokenize_ligand_smiles(
         raise ValueError(f"Failed to parse SMILES: {smiles}")
     mol = Chem.AddHs(mol)
 
-    # Assign atom names using canonical ranking
-    canonical_order = AllChem.CanonicalRankAtoms(mol)  # ty:ignore[unresolved-attribute]
-    for atom, can_idx in zip(mol.GetAtoms(), canonical_order):
-        atom_name = atom.GetSymbol().upper() + str(can_idx + 1)
-        if len(atom_name) > 4:
-            raise ValueError(
-                f"SMILES {smiles} has atom name longer than 4 chars: {atom_name}"
-            )
+    # Assign atom names using canonical ranking. The model feature is four
+    # characters wide; large hydrogenated ligands may otherwise yield CL100.
+    canonical_order = list(
+        AllChem.CanonicalRankAtoms(mol)  # ty:ignore[unresolved-attribute]
+    )
+    atom_names = _smiles_atom_names(
+        [atom.GetSymbol() for atom in mol.GetAtoms()], canonical_order
+    )
+    for atom, atom_name in zip(mol.GetAtoms(), atom_names, strict=True):
         atom.SetProp("name", atom_name)
 
     # Generate 3D conformer
