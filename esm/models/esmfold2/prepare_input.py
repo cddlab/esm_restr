@@ -100,7 +100,7 @@ class ChainInfo:
     sym_id: int
     mol_type: int
     tokens: list[TokenInfo] = field(default_factory=list)
-    # (atom_name1, atom_name2) bonds for SMILES ligands, which have no CCD entry.
+    # (atom_name1, atom_name2, order) bonds for SMILES ligands, which have no CCD entry.
     ligand_bonds: list[tuple[str, str, int]] = field(default_factory=list)
     # (atom_name1, atom_name2, order) CCD ligand bonds with Kekulized order, populated by
     # compute_token_bonds. Carries bond order to the rgi_utils conformer restraint adapter
@@ -108,6 +108,9 @@ class ChainInfo:
     ligand_bond_orders: list[tuple[str, str, int]] = field(default_factory=list)
     # Per-chain conformer-restraints opt-in from the sequence input.
     conformer_restraints: bool = False
+    # Original user SMILES, retained so rgi_utils can compare relaxed reference
+    # coordinates with graph-defined tetrahedral and E/Z stereochemistry.
+    source_smiles: str | None = None
 
 
 # =============================================================================
@@ -861,6 +864,11 @@ def build_chains_from_input(
                 tokens=new_tokens,
                 ligand_bonds=ligand_bonds if isinstance(item, LigandInput) else [],
                 conformer_restraints=item.conformer_restraints,
+                source_smiles=(
+                    item.smiles
+                    if isinstance(item, LigandInput) and item.ccd is None
+                    else None
+                ),
             )
             chains.append(chain)
             all_tokens.extend(new_tokens)
