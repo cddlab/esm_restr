@@ -232,7 +232,7 @@ def get_ligand_ccd_bonds(comp_id: str) -> list[tuple[str, str, int]] | None:
     its H) and would silently collapse aromatic bonds to single. Passing aromatic as 4
     instead lets the downstream ``build_ligand_mol`` (order_map 4 -> BondType.AROMATIC)
     re-perceive aromaticity, so the conformer restraint's UFF-relaxed bond/angle target
-    keeps aromatic rings planar. The order is consumed only by the rgi_utils restraint
+    keeps aromatic rings planar. The order is consumed only by the rgi_toolkit restraint
     (via the ESMFold2 adapter -> chain_infos); token_bonds ignores the order column.
 
     Returns None if CCD data not available.

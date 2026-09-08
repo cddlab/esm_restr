@@ -377,9 +377,9 @@ class ESMFold2InputBuilder:
         complex_id : str
             Identifier assigned to the predicted MolecularComplex(es).
         restraints_config : dict, optional
-            rgi_utils restraint-guided-inference config (distance + ligand conformer
+            rgi_toolkit restraint-guided-inference config (distance + ligand conformer
             restraints). When set, restraints are applied to the x0 prediction at each
-            diffusion step. Requires ``rgi_utils[torch]`` to be importable.
+            diffusion step. Requires ``rgi-toolkit`` and PyTorch to be installed.
 
         Returns
         -------
@@ -390,10 +390,10 @@ class ESMFold2InputBuilder:
             input, seed=seed, device=model.device
         )
 
-        # Restraint-guided inference (rgi_utils, optional): build ONE
+        # Restraint-guided inference (rgi_toolkit, optional): build ONE
         # CombinedRestraints per structure from the prepared features + chain
         # metadata. The model applies restr.minimize() to the x0 prediction after
-        # each diffusion step (gated on the pre-step sigma). rgi_utils is imported
+        # each diffusion step (gated on the pre-step sigma). rgi_toolkit is imported
         # lazily so it is only required when restraints_config is provided.
         restr = None
         if restraints_config:
@@ -401,8 +401,8 @@ class ESMFold2InputBuilder:
                 PROTEIN_RESIDUE_TO_RES_TYPE,
             )
 
-            from rgi_utils.combined import CombinedRestraints
-            from rgi_utils.esmfold2.adapter import ESMFold2Adapter
+            from rgi_toolkit.combined import CombinedRestraints
+            from rgi_toolkit.esmfold2.adapter import ESMFold2Adapter
 
             # {res_type int -> 3-letter} so the adapter can fill AtomRecord.resname
             # (enables pairing="align" RMSD restraints) without importing the model.

@@ -42,12 +42,12 @@ def test_smiles_ligand_bonds_match_molecular_graph(smiles: str):
 
 def test_mau_source_stereo_survives_reference_conformer_recovery():
     """RGI must repair the MAU seed-0 reference that inverts one E/Z bond."""
-    from rgi_utils._mol_build import (
+    from rgi_toolkit._mol_build import (
         _expected_stereo,
         _stereo_mismatch_counts,
         ff_relax,
     )
-    from rgi_utils.esmfold2.adapter import ESMFold2Adapter
+    from rgi_toolkit.esmfold2.adapter import ESMFold2Adapter
 
     spi = StructurePredictionInput(
         sequences=[

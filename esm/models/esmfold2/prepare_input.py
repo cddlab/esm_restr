@@ -103,12 +103,12 @@ class ChainInfo:
     # (atom_name1, atom_name2, order) bonds for SMILES ligands, which have no CCD entry.
     ligand_bonds: list[tuple[str, str, int]] = field(default_factory=list)
     # (atom_name1, atom_name2, order) CCD ligand bonds with Kekulized order, populated by
-    # compute_token_bonds. Carries bond order to the rgi_utils conformer restraint adapter
+    # compute_token_bonds. Carries bond order to the rgi_toolkit conformer restraint adapter
     # (the binary token_bonds feature drops it); enables aromatic-aware UFF-relax targets.
     ligand_bond_orders: list[tuple[str, str, int]] = field(default_factory=list)
     # Per-chain conformer-restraints opt-in from the sequence input.
     conformer_restraints: bool = False
-    # Original user SMILES, retained so rgi_utils can compare relaxed reference
+    # Original user SMILES, retained so rgi_toolkit can compare relaxed reference
     # coordinates with graph-defined tetrahedral and E/Z stereochemistry.
     source_smiles: str | None = None
 
@@ -1041,7 +1041,7 @@ def compute_token_bonds(
     ``ChainInfo.ligand_bond_orders``, where ``order`` is the Kekulized RDKit bond order
     (aromatic -> 1/2). The dense ``token_bonds`` the model consumes stays binary; the
     orders ride on chain_infos (NOT the model feature dict, which is batched/moved to
-    device) for the rgi_utils conformer restraint (ESMFold2 adapter), which needs
+    device) for the rgi_toolkit conformer restraint (ESMFold2 adapter), which needs
     aromatic perception so its UFF-relaxed bond/angle target keeps rings planar.
     """
     n_tokens = len(tokens)

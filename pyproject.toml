@@ -84,7 +84,7 @@ python = "3.12.*"
 [tool.pixi.pypi-dependencies]
 esm = { path = ".", editable = true }
 # RGI shared engine (no extra: esm supplies its own cu128 torch above).
-rgi-utils = { git = "https://github.com/cddlab/rgi_utils.git" }
+rgi-toolkit = { git = "https://github.com/cddlab/rgi_toolkit.git" }
 
 # Pull torch from the CUDA 12.8 wheel index so it ships Blackwell (sm_120) kernels.
 # cu128 wheels remain backward-compatible with sm_89 (RTX 4090), so esm runs on every
