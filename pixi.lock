@@ -148,7 +148,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/wheel-0.45.1-pyhd8ed1ab_1.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/zipp-3.21.0-pyhd8ed1ab_1.conda
       - pypi: .
-      - pypi: git+https://github.com/cddlab/rgi_toolkit.git#9e766207f213d05e022e80000e9a3da2347749ce
+      - pypi: git+https://github.com/cddlab/rgi_toolkit.git#fb12f5ec857250e03c45a9342650136c91d8bd97
       - pypi: git+https://github.com/cddlab/transformers_restr.git?rev=rgi-integration#0b685c92dbb09e6d9f81bcb4a4af7672ed3a82a2
       - pypi: git+https://github.com/nrontsis/DockQ.git?rev=ba4df5adaad7c77fd60851d0b7b05f2b77061ba2#ba4df5adaad7c77fd60851d0b7b05f2b77061ba2
       - pypi: https://download-r2.pytorch.org/whl/triton-3.7.1-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl
@@ -357,7 +357,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/zstandard-0.23.0-py312hea69d52_2.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/zstd-1.5.7-h6491c7d_2.conda
       - pypi: .
-      - pypi: git+https://github.com/cddlab/rgi_toolkit.git#9e766207f213d05e022e80000e9a3da2347749ce
+      - pypi: git+https://github.com/cddlab/rgi_toolkit.git#fb12f5ec857250e03c45a9342650136c91d8bd97
       - pypi: git+https://github.com/cddlab/transformers_restr.git?rev=rgi-integration#0b685c92dbb09e6d9f81bcb4a4af7672ed3a82a2
       - pypi: git+https://github.com/nrontsis/DockQ.git?rev=ba4df5adaad7c77fd60851d0b7b05f2b77061ba2#ba4df5adaad7c77fd60851d0b7b05f2b77061ba2
       - pypi: https://download.pytorch.org/whl/jinja2-3.1.6-py3-none-any.whl
@@ -649,7 +649,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/wheel-0.45.1-pyhd8ed1ab_1.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/zipp-3.21.0-pyhd8ed1ab_1.conda
       - pypi: .
-      - pypi: git+https://github.com/cddlab/rgi_toolkit.git#9e766207f213d05e022e80000e9a3da2347749ce
+      - pypi: git+https://github.com/cddlab/rgi_toolkit.git#fb12f5ec857250e03c45a9342650136c91d8bd97
       - pypi: git+https://github.com/cddlab/transformers_restr.git?rev=rgi-integration#0b685c92dbb09e6d9f81bcb4a4af7672ed3a82a2
       - pypi: git+https://github.com/nrontsis/DockQ.git?rev=ba4df5adaad7c77fd60851d0b7b05f2b77061ba2#ba4df5adaad7c77fd60851d0b7b05f2b77061ba2
       - pypi: https://download-r2.pytorch.org/whl/triton-3.7.1-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl
@@ -883,7 +883,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/zstandard-0.23.0-py312hea69d52_2.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/zstd-1.5.7-h6491c7d_2.conda
       - pypi: .
-      - pypi: git+https://github.com/cddlab/rgi_toolkit.git#9e766207f213d05e022e80000e9a3da2347749ce
+      - pypi: git+https://github.com/cddlab/rgi_toolkit.git#fb12f5ec857250e03c45a9342650136c91d8bd97
       - pypi: git+https://github.com/cddlab/transformers_restr.git?rev=rgi-integration#0b685c92dbb09e6d9f81bcb4a4af7672ed3a82a2
       - pypi: git+https://github.com/nrontsis/DockQ.git?rev=ba4df5adaad7c77fd60851d0b7b05f2b77061ba2#ba4df5adaad7c77fd60851d0b7b05f2b77061ba2
       - pypi: https://download.pytorch.org/whl/jinja2-3.1.6-py3-none-any.whl
@@ -5308,18 +5308,20 @@ packages:
   - accelerate
   - dockq @ git+https://github.com/nrontsis/DockQ.git@ba4df5adaad7c77fd60851d0b7b05f2b77061ba2
   requires_python: '>=3.12,<3.13'
-- pypi: git+https://github.com/cddlab/rgi_toolkit.git#9e766207f213d05e022e80000e9a3da2347749ce
+- pypi: git+https://github.com/cddlab/rgi_toolkit.git#fb12f5ec857250e03c45a9342650136c91d8bd97
   name: rgi-toolkit
   version: 0.1.0
   requires_dist:
   - numpy
+  - pyyaml>=6
   - rdkit>=2024.3.2
   - gemmi>=0.6.5
   - biopython>=1.84
-  - torch>=2.2 ; extra == 'torch'
-  - jax ; extra == 'jax'
-  - jaxlib ; extra == 'jax'
-  - jaxopt ; extra == 'jax'
+  - filelock>=3
+  - torch>=2.2; extra == "torch"
+  - jax; extra == "jax"
+  - jaxlib; extra == "jax"
+  - jaxopt; extra == "jax"
   requires_python: '>=3.12'
 - pypi: git+https://github.com/cddlab/transformers_restr.git?rev=rgi-integration#0b685c92dbb09e6d9f81bcb4a4af7672ed3a82a2
   name: transformers

@@ -397,12 +397,12 @@ class ESMFold2InputBuilder:
         # lazily so it is only required when restraints_config is provided.
         restr = None
         if restraints_config:
+            from rgi_toolkit.combined import CombinedRestraints
+            from rgi_toolkit.config import resolve_restraints_config
+            from rgi_toolkit.esmfold2.adapter import ESMFold2Adapter
             from transformers.models.esmfold2.protein_utils import (
                 PROTEIN_RESIDUE_TO_RES_TYPE,
             )
-
-            from rgi_toolkit.combined import CombinedRestraints
-            from rgi_toolkit.esmfold2.adapter import ESMFold2Adapter
 
             # {res_type int -> 3-letter} so the adapter can fill AtomRecord.resname
             # (enables pairing="align" RMSD restraints) without importing the model.
@@ -411,7 +411,7 @@ class ESMFold2InputBuilder:
             restr.setup(
                 ESMFold2Adapter(features, chain_infos, res_type_names=res_type_names),
                 nbatch=num_diffusion_samples,
-                config=restraints_config,
+                config=resolve_restraints_config(restraints_config),
             )
 
         sampler_kwargs: dict[str, Any] = {}
