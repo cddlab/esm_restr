@@ -17,16 +17,25 @@ from esm.utils.parsing import FastaEntry, read_sequences, write_sequences
 from esm.utils.sequential_dataclass import SequentialDataclass
 from esm.utils.system import PathOrBuffer
 
-REMOVE_LOWERCASE_TRANSLATION = str.maketrans(dict.fromkeys(string.ascii_lowercase))
+REMOVE_A3M_INSERTION_TRANSLATION = str.maketrans(
+    dict.fromkeys(string.ascii_lowercase + ".")
+)
 
 
 def remove_insertions_from_sequence(seq: str) -> str:
-    return seq.translate(REMOVE_LOWERCASE_TRANSLATION)
+    return seq.translate(REMOVE_A3M_INSERTION_TRANSLATION)
 
 
 def is_a3m_insertion(ch: str) -> bool:
     """True for an a3m insertion character (a lowercase letter or ``.``)."""
     return ch == "." or ch.islower()
+
+
+def _as_index(indices: Sequence[int] | np.ndarray | slice) -> np.ndarray | slice:
+    """Indices numpy will accept, so an empty selection still indexes."""
+    if isinstance(indices, slice):
+        return indices
+    return np.asarray(indices, dtype=int)
 
 
 def a3m_deletion_counts(seq: str) -> np.ndarray:
@@ -41,6 +50,29 @@ def a3m_deletion_counts(seq: str) -> np.ndarray:
     insertions_before = np.concatenate(([0], np.cumsum(is_insertion)))
     match_positions = np.nonzero(~is_insertion)[0]
     return np.diff(insertions_before[match_positions], prepend=0)
+
+
+def stack_a3m_deletion_counts(sequences: Sequence[str]) -> np.ndarray | None:
+    """Per-row :func:`a3m_deletion_counts`, stacked, or None for an empty alignment.
+
+    Raises on a ragged alignment, where the rows disagree on how many match columns
+    they describe.
+    """
+    if len(sequences) == 0:
+        return None
+    first = a3m_deletion_counts(sequences[0])
+    # Filled row by row
+    out = np.empty((len(sequences), len(first)), dtype=np.float32)
+    out[0] = first
+    for index in range(1, len(sequences)):
+        row = a3m_deletion_counts(sequences[index])
+        if len(row) != out.shape[1]:
+            raise ValueError(
+                "A3M match-column count mismatch. "
+                f"Expected: {out.shape[1]}, Received: {len(row)}"
+            )
+        out[index] = row
+    return out
 
 
 @dataclass(frozen=True)
@@ -80,21 +112,19 @@ class MSA(SequentialDataclass):
         max_sequences: int | None = None,
     ) -> MSA:
         entries = []
-        deletion_rows: list[np.ndarray] = []
+        # Only kept when the insertions are about to be stripped out of `entries`,
+        # since they are what the counts are derived from.
+        stripped_from: list[str] = []
         for header, raw in islice(read_sequences(path), max_sequences):
-            deletion_row = a3m_deletion_counts(raw)
-            if deletion_rows and len(deletion_row) != len(deletion_rows[0]):
-                raise ValueError(
-                    "A3M match-column count mismatch. "
-                    f"Expected: {len(deletion_rows[0])}, Received: {len(deletion_row)}"
-                )
-            deletion_rows.append(deletion_row)
-            seq = remove_insertions_from_sequence(raw) if remove_insertions else raw
-            entries.append(FastaEntry(header, seq))
-        deletions = (
-            np.stack(deletion_rows).astype(np.float32) if deletion_rows else None
+            if remove_insertions:
+                stripped_from.append(raw)
+                entries.append(FastaEntry(header, remove_insertions_from_sequence(raw)))
+            else:
+                entries.append(FastaEntry(header, raw))
+        counted_from = (
+            stripped_from if remove_insertions else [e.sequence for e in entries]
         )
-        return cls(entries, deletions=deletions)
+        return cls(entries, deletions=stack_a3m_deletion_counts(counted_from))
 
     def to_a3m(self, path: PathOrBuffer) -> None:
         write_sequences(self.entries, path)
@@ -111,9 +141,9 @@ class MSA(SequentialDataclass):
             header = f"{record.id} {record.description}"
             seq = str(record.seq)
             if entries:
-                assert (
-                    len(seq) == len(entries[0].sequence)
-                ), f"Sequence length mismatch. Expected: {len(entries[0].sequence)}, Received: {len(seq)}"
+                assert len(seq) == len(entries[0].sequence), (
+                    f"Sequence length mismatch. Expected: {len(entries[0].sequence)}, Received: {len(seq)}"
+                )
             entries.append(FastaEntry(header, seq))
         msa = cls(entries)
         if remove_insertions:
@@ -166,13 +196,16 @@ class MSA(SequentialDataclass):
         cls, sequences: list[str], remove_insertions: bool = False
     ) -> MSA:
         if remove_insertions:
-            entries = [
-                FastaEntry("", remove_insertions_from_sequence(seq))
-                for seq in sequences
-            ]
-        else:
-            entries = [FastaEntry("", seq) for seq in sequences]
-        return cls(entries)
+            # Carry the counts, as from_a3m does: stripping without them discards the
+            # deletion features the folding models consume.
+            return cls(
+                [
+                    FastaEntry("", remove_insertions_from_sequence(seq))
+                    for seq in sequences
+                ],
+                deletions=stack_a3m_deletion_counts(sequences),
+            )
+        return cls([FastaEntry("", seq) for seq in sequences])
 
     def state_dict(self, json_serializable: bool = False) -> dict[str, Any]:
         """Serialize for the Forge wire / storage (mirrors ``ProteinComplex``).
@@ -227,7 +260,8 @@ class MSA(SequentialDataclass):
 
     @property
     def seqlen(self) -> int:
-        return len(self.entries[0].sequence)
+        # 0 for an empty alignment, matching `depth`
+        return len(self.entries[0].sequence) if self.entries else 0
 
     @cached_property
     def array(self) -> np.ndarray:
@@ -242,7 +276,11 @@ class MSA(SequentialDataclass):
 
         Misalignment means the sequences still carry insertions (length !=
         match-column count), so the stored deletions no longer describe them."""
-        if self.deletions is None or self.deletions.shape != (self.depth, self.seqlen):
+        if self.deletions is None:
+            return None
+        if self.depth == 0:
+            return self.deletions if self.deletions.shape[0] == 0 else None
+        if self.deletions.shape != (self.depth, self.seqlen):
             return None
         return self.deletions
 
@@ -250,15 +288,17 @@ class MSA(SequentialDataclass):
         """Column-subselect ``deletions`` to match a position subselect, or None
         when ``deletions`` is not column-aligned with the sequences (e.g. the
         sequences still carry insertions, so length != match-column count)."""
-        if self.deletions is None or self.deletions.shape[1] != self.seqlen:
+        if self.deletions is None:
             return None
-        return self.deletions[:, indices]
+        if self.depth > 0 and self.deletions.shape[1] != self.seqlen:
+            return None
+        return self.deletions[:, _as_index(indices)]
 
     def select_sequences(self, indices: Sequence[int] | np.ndarray) -> MSA:
         """Subselect rows of the MSA."""
         entries = [self.entries[idx] for idx in indices]
         deletions = (
-            None if self.deletions is None else self.deletions[np.asarray(indices)]
+            None if self.deletions is None else self.deletions[_as_index(indices)]
         )
         return dataclasses.replace(self, entries=entries, deletions=deletions)
 
@@ -442,9 +482,7 @@ class MSA(SequentialDataclass):
         if join_token == "":
             per_msa = [msa._aligned_deletions() for msa in msas]
             if all(d is not None for d in per_msa):
-                deletions = np.concatenate(
-                    per_msa, axis=1
-                )  # ty: ignore[no-matching-overload]
+                deletions = np.concatenate(per_msa, axis=1)  # ty: ignore[no-matching-overload]
         return cls(entries, deletions=deletions)
 
 
@@ -457,9 +495,9 @@ class FastMSA(SequentialDataclass):
 
     def __post_init__(self):
         if self.headers is not None:
-            assert (
-                len(self.headers) == self.depth
-            ), "Number of headers must match depth."
+            assert len(self.headers) == self.depth, (
+                "Number of headers must match depth."
+            )
 
     @classmethod
     def from_bytes(cls, data: bytes) -> FastMSA:

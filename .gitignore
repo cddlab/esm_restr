@@ -18,3 +18,11 @@ esm.egg-info
 /run_restr_example.err
 /run_*.log
 /target.fasta
+
+# pytest --cov artifacts
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+pytest.xml
+.ruff_cache/

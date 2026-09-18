@@ -1,0 +1,250 @@
+"""Tests for ESMFold2 input preparation (prepare_input)."""
+
+import pytest
+from rdkit import Chem
+
+from esm.models.esmfold2.prepare_input import (
+    _entity_key,
+    build_chains_from_input,
+    compute_token_bonds,
+)
+from esm.models.esmfold2.processor import ESMFold2InputBuilder
+from esm.models.esmfold2.types import (
+    CovalentBond,
+    LigandInput,
+    Modification,
+    ProteinInput,
+    StructurePredictionInput,
+)
+
+
+@pytest.mark.parametrize(
+    "smiles",
+    [
+        "c1ccccc1",  # benzene: 6 atoms, 6 bonds
+        # The drug-like ligand from the SMILES-vs-CCD issue.
+        "COC1=CC=C(N2C3=C(C(C(N)=O)=N2)CCN(C4=CC=C(N5CCCCC5=O)C=C4)C3=O)C=C1",
+    ],
+)
+def test_smiles_ligand_bonds_match_molecular_graph(smiles: str):
+    """SMILES ligand bonds must match the molecular graph, not a clique (#313)."""
+    spi = StructurePredictionInput(sequences=[LigandInput(id="B", smiles=smiles)])
+    chains, tokens, atoms = build_chains_from_input(spi, seed=0)
+    token_bonds = compute_token_bonds(tokens, atoms, spi, chains)
+
+    mol = Chem.MolFromSmiles(smiles)
+    assert chains[0].source_smiles == smiles
+    assert len(tokens) == mol.GetNumAtoms()
+    n_edges = int(token_bonds.sum().item()) // 2  # symmetric matrix
+    assert n_edges == mol.GetNumBonds()
+    assert n_edges < len(tokens) * (len(tokens) - 1) // 2  # not a clique
+
+
+def test_entity_key_separates_chemically_distinct_chains():
+    """Same sequence but different chemistry must not collapse to one entity.
+
+    Entities that merge also become sym_id copies of each other, i.e. claim a
+    symmetry between two chains that are not copies.
+    """
+    plain = ProteinInput(id="A", sequence="AAAGGG")
+    modified = ProteinInput(
+        id="B", sequence="AAAGGG", modifications=[Modification(position=1, ccd="MSE")]
+    )
+
+    assert _entity_key(plain) == _entity_key(ProteinInput(id="D", sequence="AAAGGG"))
+    assert _entity_key(plain) != _entity_key(modified)
+
+
+def test_entity_key_ignores_smiles_when_ccd_is_present():
+    """A redundant smiles must not split one ligand entity into two.
+
+    Tokenization takes the ccd branch and warns that the smiles is unused, so a
+    key that reads both fields would call two identically tokenized chains
+    different entities.
+    """
+    assert _entity_key(LigandInput(id="A", ccd=["HEM"])) == _entity_key(
+        LigandInput(id="B", ccd=["HEM"], smiles="CCO")
+    )
+    assert _entity_key(LigandInput(id="A", ccd=["HEM"])) != _entity_key(
+        LigandInput(id="B", ccd=["NAG"])
+    )
+
+
+def test_build_chains_assigns_entity_and_sym_ids_to_repeated_ligands():
+    """Repeated copies are one entity numbered by sym_id, through the real builder.
+
+    sym_id is what the relative position encoding turns into its cross-chain
+    feature, so entity dedup is only correct if the sym_id it drives is too.
+    """
+    spi = StructurePredictionInput(
+        sequences=[
+            LigandInput(id="A", smiles="CCO"),
+            LigandInput(id="B", smiles="c1ccccc1"),
+            LigandInput(id="C", smiles="CCO"),
+        ]
+    )
+    chains, _, _ = build_chains_from_input(spi, seed=0)
+
+    assert [c.entity_id for c in chains] == [0, 1, 0]
+    assert [c.sym_id for c in chains] == [0, 0, 1]
+
+
+def test_build_chains_numbers_copies_across_both_id_forms():
+    """One entry with several ids and a duplicate entry must keep counting.
+
+    ``id=['A', 'B']`` expands to two chains inside one entry while chain C is a
+    separate entry for the same entity, so the three copies are sym_id 0, 1, 2.
+    """
+    spi = StructurePredictionInput(
+        sequences=[
+            LigandInput(id=["A", "B"], smiles="CCO"),
+            LigandInput(id="C", smiles="CCO"),
+        ]
+    )
+    chains, _, _ = build_chains_from_input(spi, seed=0)
+
+    assert [c.chain_id for c in chains] == ["A", "B", "C"]
+    assert [c.entity_id for c in chains] == [0, 0, 0]
+    assert [c.sym_id for c in chains] == [0, 1, 2]
+
+
+def _covalent_bond_input(bonds: list[CovalentBond] | None) -> StructurePredictionInput:
+    """Protein with a lysine at residue 3 plus an ethanol ligand.
+
+    LYS is the shortest residue that reproduces the semaglutide case: 9 heavy
+    atoms, NZ last at 0-based index 8.
+    """
+    return StructurePredictionInput(
+        sequences=[
+            ProteinInput(id="A", sequence="AAAKGG"),
+            LigandInput(id="B", smiles="CCO"),
+        ],
+        covalent_bonds=bonds,
+    )
+
+
+def test_valid_covalent_bond_is_added_to_token_bonds(ccd_pickle):
+    """A resolvable bond must reach the matrix, on the LYS NZ token pair."""
+    plain = _covalent_bond_input(None)
+    chains, tokens, atoms = build_chains_from_input(plain, seed=0)
+    baseline = compute_token_bonds(tokens, atoms, plain, chains)
+
+    # (A, res 3, atom 8) is LYS NZ; (B, res 0, atom 0) is the ligand's first atom.
+    bonded = _covalent_bond_input(
+        [
+            CovalentBond(
+                chain_id1="A",
+                res_idx1=3,
+                atom_idx1=8,
+                chain_id2="B",
+                res_idx2=0,
+                atom_idx2=0,
+            )
+        ]
+    )
+    chains, tokens, atoms = build_chains_from_input(bonded, seed=0)
+    token_bonds = compute_token_bonds(tokens, atoms, bonded, chains)
+
+    # The matrix is symmetric, so one bond is two nonzero entries.
+    assert int((token_bonds != 0).sum()) == int((baseline != 0).sum()) + 2
+
+    nz_token = tokens[3].token_index
+    ligand_token = tokens[6].token_index
+    assert atoms[tokens[3].atom_start + 8].name == "NZ"
+    assert token_bonds[nz_token, ligand_token, 0] != 0
+    assert token_bonds[ligand_token, nz_token, 0] != 0
+
+
+def test_covalent_bond_with_unknown_chain_id_raises(ccd_pickle):
+    """A chain id that does not exist must not be silently dropped."""
+    spi = _covalent_bond_input(
+        [
+            CovalentBond(
+                chain_id1="a",
+                res_idx1=3,
+                atom_idx1=8,
+                chain_id2="B",
+                res_idx2=0,
+                atom_idx2=0,
+            )
+        ]
+    )
+    chains, tokens, atoms = build_chains_from_input(spi, seed=0)
+    with pytest.raises(ValueError, match=r"chain_id 'a' does not exist"):
+        compute_token_bonds(tokens, atoms, spi, chains)
+
+
+def test_covalent_bond_with_out_of_range_residue_index_raises(ccd_pickle):
+    """A complex-wide residue index must not be silently dropped."""
+    spi = _covalent_bond_input(
+        [
+            CovalentBond(
+                chain_id1="A",
+                res_idx1=509,
+                atom_idx1=8,
+                chain_id2="B",
+                res_idx2=0,
+                atom_idx2=0,
+            )
+        ]
+    )
+    chains, tokens, atoms = build_chains_from_input(spi, seed=0)
+    with pytest.raises(
+        ValueError, match=r"residue index 509 does not exist in chain 'A'"
+    ):
+        compute_token_bonds(tokens, atoms, spi, chains)
+
+
+def test_covalent_bond_with_out_of_range_atom_index_raises(ccd_pickle):
+    """A 1-based atom index must not be silently dropped (LYS has 9 atoms, 0-8)."""
+    spi = _covalent_bond_input(
+        [
+            CovalentBond(
+                chain_id1="A",
+                res_idx1=3,
+                atom_idx1=9,
+                chain_id2="B",
+                res_idx2=0,
+                atom_idx2=0,
+            )
+        ]
+    )
+    chains, tokens, atoms = build_chains_from_input(spi, seed=0)
+    with pytest.raises(
+        ValueError,
+        match=r"atom index 9 does not exist in residue 3 of chain 'A'\. "
+        r"This residue has 9 atoms",
+    ):
+        compute_token_bonds(tokens, atoms, spi, chains)
+
+
+MAU_SMILES = (
+    "C/C=C\\C=C\\[C@@H]1O[C@](O)([C@H](CC)C(=O)NC/C=C/C=C(\\C)"
+    "[C@@H](OC)[C@@H](C)[C@@H]2O[C@H](/C=C/C=C/C=C(\\C)C(=O)"
+    "c3c(O)ccn(C)c3=O)[C@H](O)[C@@H]2O)[C@H](O)[C@H](O)C1(C)C"
+)
+
+
+def test_mau_source_stereo_survives_reference_conformer_recovery():
+    """RGI must repair the MAU seed-0 reference that inverts one E/Z bond."""
+    from rgi_toolkit._mol_build import (
+        _expected_stereo,
+        _stereo_mismatch_counts,
+        ff_relax,
+    )
+    from rgi_toolkit.esmfold2.adapter import ESMFold2Adapter
+
+    spi = StructurePredictionInput(
+        sequences=[LigandInput(id="B", smiles=MAU_SMILES, conformer_restraints=True)]
+    )
+    features, chains = ESMFold2InputBuilder().prepare_input(spi, seed=0)
+    ligand = next(ESMFold2Adapter(features, chains).iter_ligand_confs())
+    expected = _expected_stereo(ligand.stereo_mol, ligand.conf_coords)
+    assert _stereo_mismatch_counts(ligand.stereo_mol, ligand.conf_coords, expected) == (
+        0,
+        1,
+    )
+
+    repaired = ff_relax(ligand.mol, ligand.conf_coords, stereo_mol=ligand.stereo_mol)
+    assert repaired is not None
+    assert _stereo_mismatch_counts(ligand.stereo_mol, repaired, expected) == (0, 0)

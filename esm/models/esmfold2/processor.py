@@ -1,4 +1,5 @@
 import random
+import warnings
 from contextlib import contextmanager, nullcontext
 from pathlib import Path
 from typing import Any
@@ -279,6 +280,8 @@ class ESMFold2InputBuilder:
         pair_chains_t = output.get("pair_chains_iptm")
         residue_index_t = output.get("residue_index")
         entity_id_t = output.get("entity_id")
+        emb_seq_t = output.get("output_embedding_sequence")
+        emb_pair_pooled_t = output.get("output_embedding_pair_pooled")
 
         results: list[MolecularComplexResult] = []
         for i in range(Bm):
@@ -318,6 +321,14 @@ class ESMFold2InputBuilder:
                         if entity_id_t is not None
                         else None
                     ),
+                    output_embedding_sequence=(
+                        emb_seq_t[0].detach().cpu() if emb_seq_t is not None else None
+                    ),
+                    output_embedding_pair_pooled=(
+                        emb_pair_pooled_t[0].detach().cpu()
+                        if emb_pair_pooled_t is not None
+                        else None
+                    ),
                 )
             )
 
@@ -338,10 +349,12 @@ class ESMFold2InputBuilder:
         step_scale: float | None = None,
         max_inference_sigma: float | None = None,
         lm_mask_pct: float | None = None,
-        early_exit: bool = False,
         lm_dropout: float | None = 0.3,
+        early_exit: bool | None = None,
         msa_max_depth: int | None = 1024,
         msa_column_mask_rate: float = 0.1,
+        msa_subsample_at_inference: bool | None = None,
+        include_embeddings: bool = False,
         complex_id: str = "pred",
         restraints_config: dict | None = None,
     ) -> MolecularComplexResult | list[MolecularComplexResult]:
@@ -357,7 +370,7 @@ class ESMFold2InputBuilder:
             Inference knobs forwarded to the model.
         seed : int, optional
             Seeds both input prep (SMILES conformer generation) and diffusion sampling.
-        noise_scale, step_scale, max_inference_sigma, early_exit
+        noise_scale, step_scale, max_inference_sigma
             Optional sampler overrides forwarded to the model when not None.
         lm_mask_pct : float, optional
             Fraction of sequence residues randomly masked before the PLM backbone.
@@ -368,12 +381,20 @@ class ESMFold2InputBuilder:
             value); ``0``/``None`` disables.
         msa_max_depth : int, optional
             Maximum number of MSA rows kept per loop (row subsampling
-            is drawn fresh per loop). When ``None``, MSA row subsampling is
-            disabled and the full MSA depth is used. Only affects inputs that
-            carry an MSA.
-        msa_column_mask_rate : float
+            is drawn fresh per loop). Defaults to ``config.msa_encoder.max_depth``
+            when ``None``. Only affects inputs that carry an MSA.
+        msa_column_mask_rate : float, optional
             Fraction of MSA columns masked once before the loop
-            (shared across loops). Only affects inputs that carry an MSA.
+            (shared across loops). Defaults to
+            ``config.msa_encoder.column_mask_rate`` when ``None``. Only affects
+            inputs that carry an MSA.
+        include_embeddings : bool
+            Populate ``output_embedding_pair_pooled`` on each result: the trunk's
+            final pair state averaged over the first token axis, ``[L, d_pair]``
+            fp32 on CPU. This is the same tensor, computed the same way, that the
+            Forge ``FoldingConfig.include_embeddings`` flag returns.
+            ``output_embedding_sequence`` stays None, as it does over the API -
+            neither released architecture keeps a single trunk state.
         complex_id : str
             Identifier assigned to the predicted MolecularComplex(es).
         restraints_config : dict, optional
@@ -386,6 +407,14 @@ class ESMFold2InputBuilder:
         MolecularComplexResult or list[MolecularComplexResult]
             A single result when num_diffusion_samples == 1, otherwise a list.
         """
+        if early_exit is not None or msa_subsample_at_inference is not None:
+            warnings.warn(
+                "fold(): ignoring early_exit and msa_subsample_at_inference. "
+                "Use msa_max_depth instead; early_exit was never supported.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
         features, chain_infos = self.prepare_input(
             input, seed=seed, device=model.device
         )
@@ -400,9 +429,8 @@ class ESMFold2InputBuilder:
             from rgi_toolkit.combined import CombinedRestraints
             from rgi_toolkit.config import resolve_restraints_config
             from rgi_toolkit.esmfold2.adapter import ESMFold2Adapter
-            from transformers.models.esmfold2.protein_utils import (
-                PROTEIN_RESIDUE_TO_RES_TYPE,
-            )
+
+            from esm.models.esmfold2.protein_utils import PROTEIN_RESIDUE_TO_RES_TYPE
 
             # {res_type int -> 3-letter} so the adapter can fill AtomRecord.resname
             # (enables pairing="align" RMSD restraints) without importing the model.
@@ -415,6 +443,8 @@ class ESMFold2InputBuilder:
             )
 
         sampler_kwargs: dict[str, Any] = {}
+        if restr is not None:
+            sampler_kwargs["restraints"] = restr
         if noise_scale is not None:
             sampler_kwargs["noise_scale"] = noise_scale
         if step_scale is not None:
@@ -432,12 +462,9 @@ class ESMFold2InputBuilder:
                         num_loops=num_loops,
                         num_sampling_steps=num_sampling_steps,
                         num_diffusion_samples=num_diffusion_samples,
-                        early_exit=early_exit,
                         msa_max_depth=msa_max_depth,
                         msa_column_mask_rate=msa_column_mask_rate,
-                        # A null depth means "use the full MSA" => no subsampling.
-                        msa_subsample_at_inference=msa_max_depth is not None,
-                        restraints=restr,
+                        include_embeddings=include_embeddings,
                         **sampler_kwargs,
                     )
 

@@ -28,7 +28,7 @@ class ESMProtein(ProteinType):
     # Tracks
     sequence: str | None = None
     secondary_structure: str | None = None
-    sasa: list[float | None] | None = None
+    sasa: list[float | str | None] | None = None
     function_annotations: list[FunctionAnnotation] | None = None
     coordinates: torch.Tensor | None = None
 
@@ -165,12 +165,12 @@ class ESMProtein(ProteinType):
     def to_protein_complex(
         self, copy_annotations_from_ground_truth: ProteinComplex | None = None
     ) -> ProteinComplex:
-        assert (
-            self.sequence is not None
-        ), "ESMProtein must have a sequence to convert to ProteinComplex"
-        assert (
-            self.coordinates is not None
-        ), "ESMProtein must have coordinates to convert to ProteinComplex"
+        assert self.sequence is not None, (
+            "ESMProtein must have a sequence to convert to ProteinComplex"
+        )
+        assert self.coordinates is not None, (
+            "ESMProtein must have coordinates to convert to ProteinComplex"
+        )
         coords = self.coordinates.to("cpu").numpy()
 
         chain_boundaries = get_chainbreak_boundaries_from_sequence(self.sequence)
@@ -420,6 +420,22 @@ class FoldingConfig:
     lm_mask_pct: float | None = None
     msa_max_depth: int | None = 1024
     msa_column_mask_rate: float = 0.1
+    include_embeddings: bool = False
+
+
+@define
+class FoldMaxAccuracyConfig:
+    """
+    include_pae (bool): (ESMFold2) Whether to include Predicted Aligned Error (PAE)
+        matrix in the response.
+    include_pair_chains_iptm (bool): (ESMFold2) Whether to include pair-chain IPTM
+        predictions in the response.
+    include_embeddings (bool): (ESMFold2) Whether to include sequence and pair
+        embeddings in the response.
+    """
+
+    include_pae: bool = False
+    include_pair_chains_iptm: bool = False
     include_embeddings: bool = False
 
 

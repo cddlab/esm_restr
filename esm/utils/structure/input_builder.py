@@ -3,6 +3,7 @@ from typing import Any, Sequence, TypeAlias, Union
 
 import numpy as np
 
+from esm.utils.compression import compress_state_dict, decompress_state_dict
 from esm.utils.msa import MSA
 
 # fmt: off
@@ -53,6 +54,13 @@ class LigandInput:
     ccd: list[str] | None = None
     conformer_restraints: bool = False
 
+    def __post_init__(self):
+        if isinstance(self.ccd, str):
+            raise TypeError(
+                f"LigandInput.ccd must be a list of CCD codes, not the bare "
+                f"string {self.ccd!r}. Use ccd=[{self.ccd!r}]."
+            )
+
 
 @dataclass
 class DistogramConditioning:
@@ -68,6 +76,10 @@ class PocketConditioning:
 
 @dataclass
 class CovalentBond:
+    """``res_idx`` and ``atom_idx`` are 0-based. Use care when working with PDB
+    files residue numbers that are 1-based.
+    """
+
     chain_id1: str
     res_idx1: int
     atom_idx1: int
@@ -82,6 +94,44 @@ class StructurePredictionInput:
     pocket: PocketConditioning | None = None
     distogram_conditioning: list[DistogramConditioning] | None = None
     covalent_bonds: list[CovalentBond] | None = None
+
+
+def _entity_key(item: ProteinInput | RNAInput | DNAInput | LigandInput) -> tuple:
+    """Canonical identity of a chain's chemical entity, ignoring chain ids.
+
+    Chains collapse to one entity only if they are chemically identical, so
+    modifications are part of the key: a modified chain and its unmodified twin
+    are separate entities, and merging them would make them ``sym_id`` copies of
+    each other.
+
+    Entity identity is chemical, not per-instance. Two copies of one entity can
+    therefore still differ in token count -- a covalently bonded copy of a CCD
+    ligand drops its leaving atoms while a free copy keeps them -- so "same
+    entity" does not imply "same length".
+    """
+    if isinstance(item, LigandInput):
+        # ccd wins over smiles at tokenization, so a redundant smiles alongside a
+        # ccd must not split one entity into two.
+        if item.ccd:
+            return ("NONPOLYMER", None, tuple(item.ccd))
+        return ("NONPOLYMER", item.smiles, ())
+    if isinstance(item, ProteinInput):
+        entity_type = "PROTEIN"
+    elif isinstance(item, RNAInput):
+        entity_type = "RNA"
+    elif isinstance(item, DNAInput):
+        entity_type = "DNA"
+    else:  # pragma: no cover - the annotation excludes unsupported inputs
+        raise TypeError(f"Unsupported sequence input type: {type(item)}")
+    # `msa` is excluded on purpose: it is stored per chain name, so two copies of
+    # one entity may legitimately carry different MSAs.
+    return (
+        entity_type,
+        item.sequence,
+        frozenset(
+            (mod.position, mod.ccd, mod.smiles) for mod in item.modifications or []
+        ),
+    )
 
 
 def serialize_structure_prediction_input(all_atom_input: StructurePredictionInput):
@@ -104,7 +154,7 @@ def serialize_structure_prediction_input(all_atom_input: StructurePredictionInpu
         elif seq_input.msa is None:
             chain_data["msa"] = None
         elif isinstance(seq_input.msa, MSA):
-            chain_data["msa"] = seq_input.msa.state_dict(json_serializable=True)
+            chain_data["msa"] = compress_state_dict(seq_input.msa)
         else:
             error_msg = f"MSA must be None or MSA. Got {seq_input.msa} instead."
             raise AttributeError(error_msg)
@@ -184,7 +234,9 @@ def deserialize_structure_prediction_input(
             return None
         msa_blk = chain["msa"]
         if isinstance(msa_blk, str):
-            raise ValueError(f"Unexpected MSA string value: {msa_blk!r}")
+            # `serialize_structure_prediction_input` always compresses, so expanding
+            # here is what keeps this function its inverse.
+            return MSA.from_state_dict(decompress_state_dict(msa_blk))
         return MSA.from_sequences(msa_blk["sequences"])
 
     sequences: list[ProteinInput | RNAInput | DNAInput | LigandInput] = []
