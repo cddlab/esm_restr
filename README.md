@@ -1,43 +1,4 @@
-## Restraint-guided inference
-
-This fork connects the native `EsmFold2Model` and `EsmFold2ExperimentalModel` to
-[RGI-toolkit](https://github.com/cddlab/rgi_toolkit). Pass `restraints_config` to
-`ESMFold2InputBuilder.fold()`; ligand conformers also require
-`LigandInput(..., conformer_restraints=True)`.
-
-Since ESM 3.4, the model and diffusion loop live in this package. The
-`transformers_restr` fork is no longer a runtime dependency. The optional upstream
-`EsmFold2HFAdapter` does not apply RGI and rejects an active restraint argument.
-
-```python
-from esm.models.esmfold2 import (
-    ESMFold2InputBuilder,
-    EsmFold2Model,
-    ProteinInput,
-    StructurePredictionInput,
-)
-
-model = EsmFold2Model.from_pretrained("biohub/ESMFold2", device="cuda").eval()
-query = StructurePredictionInput(
-    sequences=[ProteinInput(id="A", sequence="GLKEMALQ")]
-)
-result = ESMFold2InputBuilder().fold(
-    model,
-    query,
-    restraints_config={
-        "distance_restraints_config": [{
-            "atom_selection1": "chain A and resid 1 and name CA",
-            "atom_selection2": "chain A and resid 8 and name CA",
-            "harmonic": {"target_distance": 12.0},
-        }],
-    },
-)
-```
-
-Use `pixi install` for the declared RGI dependency, or install it alongside this
-checkout with `uv pip install -e . -e ../RGI-toolkit`. Sampler hooks use the
-pre-churn sigma and a zero-based step index; each input gets its own restraint
-instance. Omitting the configuration retains upstream behavior.
+see [RGI-toolkit](https://github.com/cddlab/rgi_toolkit) for more information.
 
 <details>
 <summary>Original README</summary>
